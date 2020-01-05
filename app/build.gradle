@@ -1,0 +1,90 @@
+apply plugin: 'com.android.application'
+apply plugin: 'com.chaquo.python'  // Must come after com.android.application
+
+afterEvaluate {
+    def assetsSrcDir = "src/main/assets/source"
+    delete assetsSrcDir
+    mkdir assetsSrcDir
+    for (filename in ["src/main/python/chaquopy/demo/ui_demo.py",
+                      "src/main/java/com/chaquo/python/demo/JavaDemoActivity.java"]) {
+        assert file(filename).exists()
+        copy {
+            from filename
+            into assetsSrcDir
+        }
+    }
+}
+
+android {
+    compileSdkVersion 28
+
+    defaultConfig {
+        minSdkVersion 16
+        targetSdkVersion 28
+
+        applicationId "com.chaquo.python.demo3"
+
+        versionName '6.3.0'
+        def verParsed = versionName.split(/\./).collect { Integer.parseInt(it) }
+        versionCode ((verParsed[0] * 1000000) + (verParsed[1] * 1000) + (verParsed[2] * 10) + 1)
+
+        python {
+            // If Chaquopy fails to find Python on your build machine, enable the following
+            // line and edit it to point to Python 3.4 or later.
+            // buildPython "C:/Python36/python.exe"
+
+            // Android UI demo
+            pip {
+                install "Pygments==2.2.0"   // Also used in Java API demo
+            }
+            staticProxy "chaquopy.demo.ui_demo"
+
+            // Python unit tests
+            pip {
+                install "MarkupSafe==1.0"
+                install "murmurhash==0.28.0"
+                install "certifi==2018.01.18"  // For TestAndroidImport
+                install "setuptools==40.4.3"   //
+            }
+            staticProxy("chaquopy.test.static_proxy.basic", "chaquopy.test.static_proxy.header",
+                        "chaquopy.test.static_proxy.method")
+            pyc {
+                src false
+            }
+        }
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+        }
+
+        // Chaquopy generates extra internal-use constructors on static proxy classes.
+        lintOptions {
+            disable "ValidFragment"
+        }
+
+        // Remove other languages imported from Android support libraries.
+        resConfigs "en"
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "demo-${variant.versionName}-${variant.name}.apk"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation "android.arch.lifecycle:extensions:1.1.0"
+    implementation 'com.android.support:appcompat-v7:28.0.0'
+    implementation 'com.android.support.constraint:constraint-layout:1.0.2'
+    implementation 'com.android.support:preference-v14:28.0.0'
+    implementation 'junit:junit:4.12'
+    testImplementation 'junit:junit:4.12'
+}
